@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    // use node to invoke vite binary (avoids permission denied on Vercel)
+    "build": "node ./node_modules/vite/bin/vite.js build",
+    "preview": "vite preview",
+    // ensure the vite bin is executable after install
+    "postinstall": "chmod +x node_modules/.bin/vite"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.18",
