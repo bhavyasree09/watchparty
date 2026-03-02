@@ -20,12 +20,16 @@ export function Room() {
   useEffect(() => {
     if (!id || !profile) return;
 
+    let isMounted = true;
+
     const joinRoom = async () => {
       const { data: room, error } = await supabase
         .from('rooms')
         .select('*, profiles!rooms_host_id_fkey(username, avatar_url)')
         .eq('id', id)
         .single();
+
+      if (!isMounted) return;
 
       if (error || !room) {
         console.error('Room not found:', error);
@@ -49,21 +53,37 @@ export function Room() {
     const roomSub = supabase
       .channel(`room:${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${id}` }, 
-        (payload) => setCurrentRoom(payload.new as any)
+        (payload) => {
+          if (isMounted) setCurrentRoom(payload.new as any);
+        }
       )
       .subscribe();
 
     const membersSub = supabase
       .channel(`members:${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: `room_id=eq.${id}` }, 
-        fetchMembers
+        () => {
+          if (isMounted) fetchMembers();
+        }
       )
       .subscribe();
 
-    return () => {
-      supabase.from('room_members').delete().match({ room_id: id, user_id: profile.id }).catch(err => console.error('Failed to remove room member:', err));
-      roomSub.unsubscribe();
-      membersSub.unsubscribe();
+    return async () => {
+      isMounted = false;
+      
+      // Remove user from room members
+      try {
+        await supabase.from('room_members').delete().match({ room_id: id, user_id: profile.id });
+      } catch (err) {
+        console.error('Failed to remove room member:', err);
+      }
+      
+      // Unsubscribe from channels
+      await Promise.all([
+        roomSub.unsubscribe(),
+        membersSub.unsubscribe()
+      ]);
+      
       setCurrentRoom(null);
     };
   }, [id, profile]);

@@ -29,6 +29,27 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 // Initialize auth listener and restore session
 let isFirstLoad = true;
+let initializationTimeout: NodeJS.Timeout | null = null;
+
+const startInitializationTimeout = () => {
+  // Set a 15 second timeout to prevent infinite loading state
+  if (initializationTimeout) clearTimeout(initializationTimeout);
+  
+  initializationTimeout = setTimeout(() => {
+    console.warn('Auth initialization timeout - forcing completion');
+    useAuthStore.setState({ loading: false, initialized: true });
+  }, 15000);
+};
+
+const clearInitializationTimeout = () => {
+  if (initializationTimeout) {
+    clearTimeout(initializationTimeout);
+    initializationTimeout = null;
+  }
+};
+
+startInitializationTimeout();
+
 supabase.auth.onAuthStateChange(async (event, session) => {
   const user = session?.user ?? null;
   useAuthStore.getState().setUser(user);
@@ -73,6 +94,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   // Mark as initialized after first load
   if (isFirstLoad) {
     isFirstLoad = false;
+    clearInitializationTimeout();
     useAuthStore.setState({ initialized: true });
   }
 

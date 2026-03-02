@@ -24,14 +24,45 @@ export function VideoChat({ roomId }: { roomId: string }) {
   // track whether the host is currently sharing screen
   const hostSharingRef = useRef(false);
 
-  // cleanup local media when stream changes or component unmounts
+  // cleanup local media when component unmounts
   useEffect(() => {
-    return () => {
+    // handler for before page unload to cleanup resources
+    const handleBeforeUnload = () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      Object.values(peersRef.current).forEach((p: any) => {
+        if (p && typeof p.destroy === 'function') {
+          p.destroy();
+        }
+      });
     };
-  }, [stream]);
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      // stop all media tracks
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
+      // destroy all peer connections
+      Object.values(peersRef.current).forEach((p: any) => {
+        if (p && typeof p.destroy === 'function') {
+          p.destroy();
+        }
+      });
+      peersRef.current = {};
+      
+      // unsubscribe from signalling channel
+      if (signallingRef.current) {
+        signallingRef.current.unsubscribe();
+        signallingRef.current = null;
+      }
+      
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   // set up signalling channel for WebRTC offers/answers
   useEffect(() => {
@@ -79,7 +110,11 @@ export function VideoChat({ roomId }: { roomId: string }) {
     if (!profile) return;
 
     // destroy existing peers
-    Object.values(peersRef.current).forEach((p: any) => p.destroy());
+    Object.values(peersRef.current).forEach((p: any) => {
+      if (p && typeof p.destroy === 'function') {
+        p.destroy();
+      }
+    });
     peersRef.current = {};
     setRemoteStreams({});
 
@@ -91,6 +126,16 @@ export function VideoChat({ roomId }: { roomId: string }) {
       const peer = createPeer(id, initiator);
       peersRef.current[id] = peer;
     });
+
+    return () => {
+      // cleanup peers when effect re-runs or component unmounts
+      Object.values(peersRef.current).forEach((p: any) => {
+        if (p && typeof p.destroy === 'function') {
+          p.destroy();
+        }
+      });
+      peersRef.current = {};
+    };
 
     // helper to make peer instance wired up to signalling
     function createPeer(peerId: string, initiator: boolean) {

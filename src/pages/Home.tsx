@@ -19,8 +19,8 @@ export function Home() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, fetchRooms)
       .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
+    return async () => {
+      await subscription.unsubscribe();
     };
   }, []);
 
