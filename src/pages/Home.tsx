@@ -55,10 +55,9 @@ export function Home() {
       .select()
       .single();
 
-    console.log('createRoom result', { data, error });
-
     if (error) {
       console.error('failed to create room', error);
+      return;
     }
 
     if (data) {

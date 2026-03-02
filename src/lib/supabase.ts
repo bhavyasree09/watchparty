@@ -21,5 +21,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // undefined arguments (the runtime warnings above will remind you).
 export const supabase = createClient<Database>(
   supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseAnonKey || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+  }
 );

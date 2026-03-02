@@ -8,22 +8,27 @@ interface AuthState {
   loading: boolean;
   setUser: (user: User | null) => void;
   setProfile: (profile: any | null) => void;
+  setLoading: (loading: boolean) => void;
   signOut: () => Promise<void>;
+  initialized: boolean;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   profile: null,
   loading: true,
+  initialized: false,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
+  setLoading: (loading) => set({ loading }),
   signOut: async () => {
     await supabase.auth.signOut();
     set({ user: null, profile: null });
   },
 }));
 
-// Initialize auth listener
+// Initialize auth listener and restore session
+let isFirstLoad = true;
 supabase.auth.onAuthStateChange(async (event, session) => {
   const user = session?.user ?? null;
   useAuthStore.getState().setUser(user);
@@ -52,11 +57,9 @@ supabase.auth.onAuthStateChange(async (event, session) => {
           console.error('Supabase: failed to create profile', upsertError);
           useAuthStore.getState().setProfile(null);
         } else {
-          console.log('Supabase: created profile', newProfile);
           useAuthStore.getState().setProfile(newProfile);
         }
       } else {
-        console.log('Supabase: fetched profile', data);
         useAuthStore.getState().setProfile(data);
       }
     } catch (err) {
@@ -65,6 +68,12 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     }
   } else {
     useAuthStore.getState().setProfile(null);
+  }
+
+  // Mark as initialized after first load
+  if (isFirstLoad) {
+    isFirstLoad = false;
+    useAuthStore.setState({ initialized: true });
   }
 
   useAuthStore.setState({ loading: false });

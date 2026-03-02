@@ -28,6 +28,7 @@ export function Room() {
         .single();
 
       if (error || !room) {
+        console.error('Room not found:', error);
         navigate('/');
         return;
       }
@@ -60,7 +61,7 @@ export function Room() {
       .subscribe();
 
     return () => {
-      supabase.from('room_members').delete().match({ room_id: id, user_id: profile.id }).then();
+      supabase.from('room_members').delete().match({ room_id: id, user_id: profile.id }).catch(err => console.error('Failed to remove room member:', err));
       roomSub.unsubscribe();
       membersSub.unsubscribe();
       setCurrentRoom(null);
